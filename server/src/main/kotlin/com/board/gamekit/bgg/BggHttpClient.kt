@@ -10,8 +10,11 @@ const val BGG_TOKEN_ENV = "BGG_API_TOKEN"
 
 fun bggApiToken(): String = System.getenv(BGG_TOKEN_ENV).orEmpty().trim()
 
-fun HttpClientConfig<*>.installBggDefaults(token: String = "") {
-    install(UserAgent) { agent = "GameKit/1.0 (contact: paw.wow.apps@gmail.com)" }
+fun userAgent(contact: String): String =
+    if (contact.isBlank()) "GameKit/1.0" else "GameKit/1.0 (contact: $contact)"
+
+fun HttpClientConfig<*>.installBggDefaults(token: String = "", contact: String = "") {
+    install(UserAgent) { agent = userAgent(contact) }
     install(HttpTimeout) {
         requestTimeoutMillis = 15_000
         connectTimeoutMillis = 10_000

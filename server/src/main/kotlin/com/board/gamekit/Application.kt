@@ -27,7 +27,7 @@ fun main(args: Array<String>) = EngineMain.main(args)
 
 fun Application.module() {
     val config = AppConfig.from(environment.config)
-    val httpClient = HttpClient(CIO) { installBggDefaults(bggApiToken()) }
+    val httpClient = HttpClient(CIO) { installBggDefaults(bggApiToken(), config.bggContact) }
     val database = GameDatabase.connect(config.databaseUrl)
 
     monitor.subscribe(ApplicationStopped) {

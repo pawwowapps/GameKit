@@ -15,6 +15,7 @@ const val TEST_BASE_URL = "https://bgg.test/xmlapi2"
 val testConfig = AppConfig(
     databaseUrl = "",
     bggBaseUrl = TEST_BASE_URL,
+    bggContact = "",
     cacheTtlMillis = 60_000,
     defaultLimit = 30,
     maxLimit = 100,

@@ -5,6 +5,7 @@ import io.ktor.server.config.ApplicationConfig
 data class AppConfig(
     val databaseUrl: String,
     val bggBaseUrl: String,
+    val bggContact: String,
     val cacheTtlMillis: Long,
     val defaultLimit: Int,
     val maxLimit: Int,
@@ -15,6 +16,7 @@ data class AppConfig(
         fun from(config: ApplicationConfig) = AppConfig(
             databaseUrl = config.property("gamekit.database.url").getString(),
             bggBaseUrl = config.property("gamekit.bgg.baseUrl").getString(),
+            bggContact = config.property("gamekit.bgg.contact").getString().trim(),
             cacheTtlMillis = config.property("gamekit.cache.ttlMinutes").getString().toLong() * 60_000L,
             defaultLimit = config.property("gamekit.search.defaultLimit").getString().toInt(),
             maxLimit = config.property("gamekit.search.maxLimit").getString().toInt(),
