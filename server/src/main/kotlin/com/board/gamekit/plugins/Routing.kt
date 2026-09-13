@@ -29,6 +29,14 @@ fun Application.configureRouting(gameRepository: GameRepository, config: AppConf
                     return@get
                 }
 
+                if (query.length < config.minQueryLength) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorResponse("Query parameter 'query' must be at least ${config.minQueryLength} characters"),
+                    )
+                    return@get
+                }
+
                 val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: config.defaultLimit
                 if (limit !in 1..config.maxLimit) {
                     call.respond(

@@ -3,11 +3,14 @@ package com.board.gamekit.db
 import com.board.gamekit.model.GameDto
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.core.notInSubQuery
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.jdbc.batchInsert
 import org.jetbrains.exposed.v1.jdbc.batchUpsert
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 
 class GameCache(
@@ -59,6 +62,15 @@ class GameCache(
             this[SearchResultsTable.bggId] = game.bggId
             this[SearchResultsTable.position] = index
         }
+    }
+
+    suspend fun evictExpired(): Int = database.query {
+        val expiredBefore = now() - ttlMillis
+        val removedQueries = SearchQueriesTable.deleteWhere { fetchedAt less expiredBefore }
+        val removedGames = GamesTable.deleteWhere {
+            bggId notInSubQuery SearchResultsTable.select(SearchResultsTable.bggId)
+        }
+        removedQueries + removedGames
     }
 
     private fun ResultRow.toGameDto() = GameDto(

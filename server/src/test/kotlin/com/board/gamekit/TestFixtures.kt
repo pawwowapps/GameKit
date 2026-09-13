@@ -18,6 +18,8 @@ val testConfig = AppConfig(
     cacheTtlMillis = 60_000,
     defaultLimit = 30,
     maxLimit = 100,
+    maxResults = 300,
+    minQueryLength = 3,
 )
 
 fun newTestDatabase(): GameDatabase {

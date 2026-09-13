@@ -47,6 +47,14 @@ class ApplicationTest {
     }
 
     @Test
+    fun `too short a query returns 400`() = testApplication {
+        installModule()
+        val response = client.get("/api/v1/games/search?query=ca")
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertTrue(response.bodyAsText().contains("at least 3 characters"), response.bodyAsText())
+    }
+
+    @Test
     fun `limit above the maximum returns 400`() = testApplication {
         installModule()
         val response = client.get("/api/v1/games/search?query=catan&limit=1000")

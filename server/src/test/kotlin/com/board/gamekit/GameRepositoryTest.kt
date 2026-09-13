@@ -9,6 +9,11 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -121,7 +126,7 @@ class GameRepositoryTest {
                 respond(if (request.url.encodedPath.endsWith("/thing")) THING_XML else SEARCH_XML, headers = xmlHeaders)
             },
             testCache(database, ttlMillis = 60_000, now = { clock }),
-            testConfig.maxLimit,
+            testConfig.maxResults,
         )
 
         repository.searchGames("catan", limit = 30, offset = 0)
@@ -215,9 +220,49 @@ class GameRepositoryTest {
         assertEquals(null, result.single().imageUrl)
     }
 
+    @Test
+    fun `concurrent identical queries trigger a single upstream fetch`() = runBlocking {
+        val searchRequests = AtomicInteger()
+        val repository = repository { request ->
+            if (request.url.encodedPath.endsWith("/thing")) {
+                respond(THING_XML, headers = xmlHeaders)
+            } else {
+                searchRequests.incrementAndGet()
+                delay(150)
+                respond(SEARCH_XML, headers = xmlHeaders)
+            }
+        }
+
+        val results = coroutineScope {
+            (1..5).map { async { repository.searchGames("catan", limit = 30, offset = 0) } }.awaitAll()
+        }
+
+        assertEquals(1, searchRequests.get(), "parallel identical queries must share one fetch")
+        results.forEach { assertEquals(listOf(13), it.map { game -> game.bggId }) }
+    }
+
+    @Test
+    fun `expired rows are evicted together with orphaned games`() = runBlocking {
+        var clock = 1_000L
+        val cache = testCache(database, ttlMillis = 60_000, now = { clock })
+        val repository = GameRepository(
+            testDataSource { request ->
+                respond(if (request.url.encodedPath.endsWith("/thing")) THING_XML else SEARCH_XML, headers = xmlHeaders)
+            },
+            cache,
+            testConfig.maxResults,
+        )
+
+        repository.searchGames("catan", limit = 30, offset = 0)
+        clock += 60_001
+
+        assertTrue(cache.evictExpired() > 0)
+        assertEquals(null, cache.find("catan", 30, 0), "evicted query must be gone, not just stale")
+    }
+
     private fun repository(handler: io.ktor.client.engine.mock.MockRequestHandler) = GameRepository(
         testDataSource(handler),
         testCache(database),
-        testConfig.maxLimit,
+        testConfig.maxResults,
     )
 }

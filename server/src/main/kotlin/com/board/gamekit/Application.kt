@@ -2,6 +2,7 @@ package com.board.gamekit
 
 import com.board.gamekit.bgg.BggDataSource
 import com.board.gamekit.bgg.BggUnavailableException
+import com.board.gamekit.bgg.bggApiToken
 import com.board.gamekit.bgg.installBggDefaults
 import com.board.gamekit.config.AppConfig
 import com.board.gamekit.db.GameCache
@@ -20,12 +21,13 @@ import io.ktor.server.application.log
 import io.ktor.server.netty.EngineMain
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.response.respond
+import kotlinx.coroutines.runBlocking
 
 fun main(args: Array<String>) = EngineMain.main(args)
 
 fun Application.module() {
     val config = AppConfig.from(environment.config)
-    val httpClient = HttpClient(CIO) { installBggDefaults() }
+    val httpClient = HttpClient(CIO) { installBggDefaults(bggApiToken()) }
     val database = GameDatabase.connect(config.databaseUrl)
 
     monitor.subscribe(ApplicationStopped) {
@@ -33,9 +35,15 @@ fun Application.module() {
         database.close()
     }
 
+    val cache = GameCache(database, config.cacheTtlMillis)
+    runBlocking {
+        val evicted = cache.evictExpired()
+        if (evicted > 0) log.info("Evicted {} stale cache rows on startup", evicted)
+    }
+
     gameKitModule(
         bggDataSource = BggDataSource(httpClient, config.bggBaseUrl),
-        cache = GameCache(database, config.cacheTtlMillis),
+        cache = cache,
         config = config,
     )
 }
@@ -43,7 +51,7 @@ fun Application.module() {
 fun Application.gameKitModule(bggDataSource: BggDataSource, cache: GameCache, config: AppConfig) {
     configureSerialization()
     configureStatusPages()
-    configureRouting(GameRepository(bggDataSource, cache, config.maxLimit), config)
+    configureRouting(GameRepository(bggDataSource, cache, config.maxResults), config)
 }
 
 private fun Application.configureStatusPages() {
